@@ -1,113 +1,219 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using UnityEngine;
 using UnityEngine.UI;
 
-public static class GameManager
+using Debug = UnityEngine.Debug;
+
+public class GameManager : MonoBehaviour
 {
+    public static GameManager Instance;
 
-    #region UCI - Universal Chess Interface
+    [Header("Windows")]
+    public GameObject boardWindow;
+    public GameObject promotionWindow;
+    public GameObject checkMateWindow;
+    public GameObject historyWindow;
+    public GameObject debugWindow;
+    public GameObject diagnosticsWindow;
 
-    [Header("Information")]
-    public static readonly string EngineName = "Endura";
-    public static readonly string EngineAuthor = "Nico Rst";
-    public static readonly string EngineVersion = Application.version;
+    [Header("UI Elements")]
+    public GameObject moveInformationPrefab;
+    public GameObject moveInformationHolder;
+    public RectTransform evaluationBar;
 
-    // GUI controlled engine stats
-    public static bool AwaitingInitialization = false;
-    public static bool AwaitingPositionLoad = false;
-    public static bool AwaitingSearch = false;
-
-    // Engine self controlled stats
-    private static bool initializationFinished = false;
-    private static bool newGamePrepared = false;
-    private static bool positionLoaded = false;
-    private static bool searchCompleted = false;
-
-    public static void InitializeUCI()
+    public enum Mode
     {
-        Console.Instance.AddToConsole($"id name {EngineName}");
-        Console.Instance.AddToConsole($"id version {EngineVersion}");
-        Console.Instance.AddToConsole($"id author {EngineAuthor}");
-
-        // Use UCI Protocol
-
-        Console.Instance.AddToConsole($"uciok");
-
-        Initialize();
+        HumanComputer,
+        Testing
     }
 
-    private static void Initialize()
-    {
-        // Initialize Engine
-        Board.Initialize();
-        Engine.Initialize();
-        Zobrist.Initialize();
+    // Hier kann der Spielmodus fuers Testen angepasst werden
+    public static Mode GameMode = Mode.HumanComputer;
 
-        initializationFinished = true;
-        EngineReady();
+    [HideInInspector] public bool DebugMode = false;
+
+    [HideInInspector] public int LatestSlotNum;
+    [HideInInspector] public GameObject StartSquare;
+
+    [HideInInspector] public List<Move> PossibleMoves = new();
+    [HideInInspector] public List<GameObject> VisualizedMoves = new();
+
+    private Move curMove;
+
+    private void Awake()
+    {
+        Instance = this;
     }
 
-    public static void ResetEngine()
+    private void Start()
     {
-        // Reset engine
-
-        newGamePrepared = true;
-        EngineReady();
-    }
-
-    private static void LoadPosition()
-    {
-        FENManager.LoadFenPosition(FENManager.fenToLoad);
-
-        positionLoaded = true;
-        EngineReady();
-    }
-
-    private static void StartSearch()
-    {
-        // Search
-        Log.Message("------------------------------------------------");
+        EngineManager.InitializeUCI();
+        FENManager.LoadFenPosition();
         Engine.Search();
 
-        searchCompleted = true;
-        EngineReady();
+        // Richtet die Evaluation Bar fuer die richtige Seite aus
+        evaluationBar.localPosition = Board.GetPlayerColor() == Piece.WHITE ? new(0, -150f) : new(0f, 150f);
     }
 
-    public static void EngineReady()
+    public void MakePhysicalMove(GameObject pointerDrag, int targetSlotNum)
     {
-        if (AwaitingInitialization && initializationFinished)
+        // Simuliert einen Drag and Drop, falls nicht das selbe Feld angewählt wurde.
+        if (targetSlotNum != LatestSlotNum)
         {
-            AwaitingInitialization = false;
-            initializationFinished = false; 
-            
-            Console.Instance.AddToConsole("readyok");
-        }
+            if (StartSquare != null)
+            {
+                pointerDrag.GetComponent<SquareSlot>().VerifyMove(StartSquare);
+            }
 
-        if (AwaitingPositionLoad && newGamePrepared)
-        {
-            AwaitingPositionLoad = false;
-            newGamePrepared = false;
-
-            LoadPosition();
-        }
-
-        if (AwaitingSearch && positionLoaded)
-        {
-            AwaitingSearch = false;
-            positionLoaded = false;
-
-            StartSearch();
-        }
-
-        if (searchCompleted)
-        {
-            searchCompleted = false;
-
-            Console.Instance.AddToConsole("bestmove 0000");
+            StartSquare = pointerDrag;
+            LatestSlotNum = targetSlotNum;
         }
     }
 
-    #endregion
+    public void MakeEngineMove(Move move)
+    {
+        StartCoroutine(ExecuteMove(move));
+    }
 
+    IEnumerator ExecuteMove(Move move)
+    {
+        yield return new WaitForSeconds(0.5f);
+
+        // Weist fuer alle beteiligten Felder die GameObjects zu
+        GameObject startSquare = BoardGeneration.instance.squaresGO[move.StartSquare];
+        GameObject targetSquare = BoardGeneration.instance.squaresGO[move.TargetSquare];
+
+        GameObject startSquarePiece = startSquare.transform.GetChild(0).gameObject;
+
+        // Spielt den Zug
+        targetSquare.GetComponentInChildren<SquareSlot>().VerifyMove(startSquarePiece, true);
+    }
+
+    public void VisualizePossibleMoves(int startSquare)
+    {
+        DevisualizePossibleMoves();
+
+        // Aktiviert die grafische Visualisierung der moeglichen Felder
+        if (PossibleMoves.Count == 0 || PossibleMoves == null) Debug.LogWarning("No possible moves assigned");
+
+        foreach (Move move in PossibleMoves)
+        {
+            if (move.StartSquare != Board.ConvertIndex120To64(startSquare)) continue;
+
+            int targetSquare = move.TargetSquare;
+            GameObject targetSquareGO = BoardGeneration.instance.squaresGO[targetSquare];
+
+            VisualizedMoves.Add(targetSquareGO);
+            targetSquareGO.transform.GetChild(2).gameObject.SetActive(true);
+        }
+    }
+
+    public void DevisualizePossibleMoves()
+    {
+        // Deaktiviert die grafische Visualisierung der moeglichen Felder
+        foreach (GameObject go in VisualizedMoves)
+        {
+            go.transform.GetChild(2).gameObject.SetActive(false);
+        }
+        VisualizedMoves = new List<GameObject>();
+    }
+
+    public void UpdateMoveHistory(Move move)
+    {
+        // Iniitiert eine neue Zeilen mit Informationen zu einem Zug
+        GameObject newMoveInformation = Instantiate(moveInformationPrefab, moveInformationHolder.transform);
+
+        Text[] prefabTexts = newMoveInformation.GetComponentsInChildren<Text>();
+        Image piece = newMoveInformation.transform.GetChild(1).GetComponent<Image>();
+        int moveCount = Board.GetMoveCount();
+
+        prefabTexts[0].text = moveCount.ToString();
+        prefabTexts[1].text = Board.DesignateSquare(Board.ConvertIndex64To120(move.StartSquare));
+        prefabTexts[2].text = Board.DesignateSquare(Board.ConvertIndex64To120(move.TargetSquare));
+
+        piece.sprite = BoardGeneration.instance.pieces[Board.PieceOnSquare(Board.ConvertIndex64To120(move.TargetSquare))];
+
+        if (moveCount > 7) (moveInformationHolder.transform as RectTransform).pivot = new Vector2(0.5f, 0);
+    }
+
+    public void SetEvaluationBar(int evaluation)
+    {
+        float side = Board.GetPlayerColor() == Piece.WHITE ? 1f : -1f;
+        float value = -side * 150f + (side * evaluation / 82f * 18.75f);
+        float min = side == 1f ? -300 : 0f;
+        float max = side == 1f ? 0 : 300;
+        float posY = Mathf.Clamp(value, min, max);
+        evaluationBar.localPosition = new(0, posY);
+    }
+
+    public void ActivatePromotionVisuals(Move move)
+    {
+        bool whiteToMove = Board.GetWhiteToMove();
+
+        promotionWindow.SetActive(true);
+        historyWindow.SetActive(false);
+        debugWindow.SetActive(false);
+
+        if (whiteToMove) promotionWindow.transform.GetChild(1).gameObject.SetActive(true);
+        else promotionWindow.transform.GetChild(2).gameObject.SetActive(true);
+
+        curMove = move;
+    }
+
+    /// <summary>
+    /// Die Funktion <c>PromotionPiece</c> wird aufgerufen, wenn ein Bauer die letzte gegnerische Reihe 
+    /// erreicht und der User eine Figur ausgewaehlt hat (Springer, Laeufer, Turm oder Dame).
+    /// </summary>
+    /// <param name="strPiece">Die ausgewaehlte Figur als char - N,n;B,b;R,r;Q,q</param>
+    public void PromotionPiece(string strPiece)
+    {
+        promotionWindow.transform.GetChild(1).gameObject.SetActive(false);
+        promotionWindow.transform.GetChild(2).gameObject.SetActive(false);
+        promotionWindow.SetActive(false);
+
+        char symbol = strPiece.ToCharArray()[0];
+
+        int pieceType = FENManager.pieceTypeFromSymbol[char.ToLower(symbol)];
+        int pieceColor = char.IsUpper(symbol) ? Piece.WHITE : Piece.BLACK;
+
+        Move move = Move.PromotionMoveWithPiece(curMove.StartSquare, curMove.TargetSquare, pieceType);
+
+        if (move == null) Debug.LogWarning("Returned move shouldn't be null");
+
+        int sqIndex = (Board.GetPlayerColor() == Piece.WHITE) ? move.TargetSquare : 63 - move.TargetSquare;
+
+        SquareSlot sqSlot = boardWindow.transform.GetChild(sqIndex).GetComponentInChildren<SquareSlot>();
+
+        sqSlot.MakeMove(sqSlot.curPromotionPointerDrag, move);
+
+        DevisualizePossibleMoves();
+    }
+
+    public void OnCheckMate()
+    {
+        diagnosticsWindow.SetActive(false);
+        checkMateWindow.SetActive(true);
+        bool isWhite = Board.GetPlayerColor() == Piece.WHITE;
+
+        Text text = checkMateWindow.GetComponentInChildren<Text>();
+
+        if (isWhite && !Board.GetWhiteToMove())
+        {
+            text.text = "You won!";
+        }
+        else
+        {
+            text.text = "You lost!";
+        }
+       
+    }
+
+    public void ToggleDebugMode()
+    {
+        DebugMode = !DebugMode;
+
+        Diagnostics.Instance.UpdateDebugInformation(DebugMode);
+    }
 }

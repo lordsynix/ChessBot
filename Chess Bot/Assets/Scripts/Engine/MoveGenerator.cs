@@ -85,7 +85,6 @@ public static class MoveGenerator
 
                 if (Piece.IsPieceType(piece) != Piece.NONE)
                 {
-                    //Debug.Log(friendlyColor + " : Piece: " + square120[sqIndex] + " : At: " + sqIndex);
                     moves.AddRange(GenerateMovesForPiece(sqIndex, square120[sqIndex]));
                 }
             }
@@ -290,16 +289,16 @@ public static class MoveGenerator
         }
     }
 
-    static bool GenerateCastlingPermission(int startSquare, int offset, bool kingside, bool permission = true)
+    static bool GenerateCastlingPermission(int startSquare, int offset, bool kingside)
     {
         // Ueberprueft, ob die Felder zwischen Koenig und Turm leer sind.
         for (int i = 1; i < 4; i++)
         {
-            int square = startSquare + i * (offset / 2);
+            int square = startSquare + (i * (offset / 2));
 
             if (square != 28 && square != 98)
             {
-                if (square120[square] != 0)
+                if (square120[square] != Piece.NONE)
                 {
                     return false;
                 }

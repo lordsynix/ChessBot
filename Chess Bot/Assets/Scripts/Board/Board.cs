@@ -7,7 +7,7 @@ using UnityEngine;
 
 public static class Board 
 {
-    private static int PlayerColor;
+    private static int PlayerColor = -1;
 
     private static int MoveCount = 0;
 
@@ -47,6 +47,8 @@ public static class Board
             int newCastlingRights = CurrentPositionState.castlingRights;
             int newEnPassantSquare = -1;
 
+            if (moveFlag == Move.CastleFlag && !Piece.IsType(movedPiece, Piece.KING)) Debug.LogError("Castle Error");
+
             // Aktualisiert die bewegte Figur
             MovePiece(movedPiece, startSquare120, targetSquare120);
 
@@ -64,7 +66,7 @@ public static class Board
 
                 // Aktualisiert das bitboard der geschlagenen Figur
                 ToggleSquare(capturedPiece, captureSquare);
-                newZobristKey ^= Zobrist.pieceKeys[captureSquare, capturedPiece];
+                newZobristKey ^= Zobrist.pieceKeys[ConvertIndex120To64(captureSquare), capturedPiece];
             }
 
             // Rochade
@@ -75,7 +77,7 @@ public static class Board
                 if (moveFlag == Move.CastleFlag)
                 {
                     int rook = Piece.ROOK | moveColor;
-                    bool kingside = targetSquare120 == 28 || targetSquare120 == 98;
+                    bool kingside = targetSquare120 == 27 || targetSquare120 == 97;
                     int oldRookSq = kingside ? startSquare120 + 3 : startSquare120 - 4;
                     int newRookSq = kingside ? startSquare120 + 1 : startSquare120 - 1;
 
@@ -176,6 +178,9 @@ public static class Board
                 AllGameMoves.Add(move);
 
                 RepetitionPositionHistroy.Push(newState.zobristKey);
+
+                Diagnostics.Instance.UpdateDebugInformation(GameManager.Instance.DebugMode);
+                Engine.Search();
             }
         }
         catch (Exception ex)
@@ -244,7 +249,7 @@ public static class Board
                 if (moveFlag is Move.CastleFlag)
                 {
                     int rookPiece = Piece.ROOK | moveColor;
-                    bool kingside = movedTo == 98 || movedTo == 28;
+                    bool kingside = movedTo == 97 || movedTo == 27;
                     int rookSquareBeforeCastling = kingside ? movedTo + 1 : movedTo - 2;
                     int rookSquareAfterCastling = kingside ? movedTo - 1 : movedTo + 1;
 
@@ -312,6 +317,11 @@ public static class Board
         return WhiteToMove;
     }
 
+    public static int GetPlayerColor()
+    {
+        return PlayerColor;
+    }
+
     public static PositionState GetCurrentPositionState()
     {
         return CurrentPositionState;
@@ -320,6 +330,27 @@ public static class Board
     public static ulong[] GetBitboards()
     {
         return Bitboards;
+    }
+
+    public static int PieceOnSquare(int sqIndex120)
+    {
+        return Square120[sqIndex120];
+    }
+
+    public static IEnumerable<int> GetPiecePositions(ulong bitboard)
+    {
+        for (int i = 0; i < 64; i++)
+        {
+            if (((bitboard >> i) & 1UL) == 1UL)
+            {
+                yield return i;
+            }
+        }
+    }
+
+    public static int GetMoveCount()
+    {
+        return MoveCount;
     }
 
     #endregion
@@ -374,7 +405,7 @@ public static class Board
 
     public static void SetMoveCount(int moveCount)
     {
-        MoveCount = (moveCount - 1) * 2 + (WhiteToMove ? 0 : 1);
+        MoveCount =  Math.Max(0, (moveCount - 1) * 2 + (WhiteToMove ? 0 : 1));
     }
 
     public static void SetCurrentPositionState(PositionState state)

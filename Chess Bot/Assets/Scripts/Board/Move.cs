@@ -8,7 +8,7 @@ using UnityEngine;
 /// </summary>
 public class Move
 {
-    // 18 Bit move value
+    // 18 Bit Zugwert
     readonly ushort moveValue;
 
     // Flags
@@ -22,12 +22,12 @@ public class Move
     public const int PromoteToRookFlag = 0b0110;
     public const int PromoteToBishopFlag = 0b0111;
 
-    // Masks
+    // Masken
     const ushort startSquareMask = 0b0000000000111111;
     const ushort targetSquareMask = 0b0000111111000000;
     const ushort flagMask = 0b1111000000000000;
 
-    // Constructors
+    // Konstruktoren
     public Move(ushort moveValue)
     {
         this.moveValue = moveValue;
@@ -35,10 +35,10 @@ public class Move
 
     public Move(int startSquare, int targetSquare)
     {
-        startSquare = Board.ConvertIndex120To64(startSquare);
-        targetSquare = Board.ConvertIndex120To64(targetSquare);
+        int _startSquare = Board.ConvertIndex120To64(startSquare);
+        int _targetSquare = Board.ConvertIndex120To64(targetSquare);
 
-        moveValue = (ushort)(startSquare | targetSquare << 6 | NoFlag << 12);
+        moveValue = (ushort)(_startSquare | _targetSquare << 6 | NoFlag << 12);
     }
 
     public Move(int startSquare, int targetSquare, int flag)
@@ -75,6 +75,18 @@ public class Move
                     return Piece.NONE;
             }
         }
+    }
+
+    public static Move PromotionMoveWithPiece(int startSquare, int targetSquare, int piece)
+    {
+        return piece switch
+        {
+            Piece.ROOK => new Move(Board.ConvertIndex64To120(startSquare), Board.ConvertIndex64To120(targetSquare), PromoteToRookFlag),
+            Piece.KNIGHT => new Move(Board.ConvertIndex64To120(startSquare), Board.ConvertIndex64To120(targetSquare), PromoteToKnightFlag),
+            Piece.BISHOP => new Move(Board.ConvertIndex64To120(startSquare), Board.ConvertIndex64To120(targetSquare), PromoteToBishopFlag),
+            Piece.QUEEN => new Move(Board.ConvertIndex64To120(startSquare), Board.ConvertIndex64To120(targetSquare), PromoteToQueenFlag),
+            _ => null,
+        };
     }
 
     public static Move NullMove => new Move(0);

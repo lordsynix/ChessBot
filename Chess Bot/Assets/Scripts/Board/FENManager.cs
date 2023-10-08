@@ -6,7 +6,7 @@ using UnityEngine;
 
 public static class FENManager
 {
-    public static string fenToLoad = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 0"; // Ausgangsposition als FEN-String
+    public static string startFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 0"; // Ausgangsposition als FEN-String
     //private const string startFEN = "r1bk3r/p2pBpNp/n4n2/1p1NP2P/6P1/3P4/P1P1K3/q5b1 b Qk ";
     //private const string startFEN = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 6";
 
@@ -15,7 +15,7 @@ public static class FENManager
     private static bool BlackCastleKingside;
     private static bool BlackCastleQueenside;
 
-    private static readonly Dictionary<char, int> pieceTypeFromSymbol = new()
+    public static readonly Dictionary<char, int> pieceTypeFromSymbol = new()
     {
         ['k'] = Piece.KING,
         ['p'] = Piece.PAWN,
@@ -30,8 +30,9 @@ public static class FENManager
     /// beliebige Schachposition unter Beruecksichtigung aller bestehender Regeln.
     /// </summary>
     /// <param name="fen">Der zu generierende FEN-String.</param>
-    public static void LoadFenPosition(string fen)
+    public static void LoadFenPosition()
     {
+        string fen = startFEN;
         Log.Message($"Loading FEN-String: {fen}");
 
         try
@@ -76,6 +77,9 @@ public static class FENManager
 
             // Definiert den Spieler, welcher als naechstes Spielen darf.
             Board.SetWhiteToMove(fenToMove == "w");
+            Board.SetPlayerColor(fenToMove.ToCharArray()[0]);
+
+            BoardGeneration.instance.Generate(square64);
 
             SetCastlePermissions(fenCastle);
 

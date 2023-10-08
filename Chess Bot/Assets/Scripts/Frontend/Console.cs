@@ -98,37 +98,37 @@ public class Console : MonoBehaviour
 
     private void OnUCI()
     {
-        GameManager.InitializeUCI();
+        EngineManager.InitializeUCI(true);
     }
 
     private void OnIsReady()
     {
-        GameManager.AwaitingInitialization = true;
+        EngineManager.AwaitingInitialization = true;
 
-        GameManager.EngineReady();
+        EngineManager.EngineReady();
     }
 
     private void OnUCINewGame()
     {
-        GameManager.ResetEngine();
+        EngineManager.ResetEngine();
     }
 
     private void OnLoadPosition(string posFEN = "")
     {
         if (!string.IsNullOrEmpty(posFEN))
         {
-            FENManager.fenToLoad = posFEN;
+            FENManager.startFEN = posFEN;
         }
 
-        GameManager.AwaitingPositionLoad = true;
+        EngineManager.AwaitingPositionLoad = true;
 
-        GameManager.EngineReady();
+        EngineManager.EngineReady();
     }
 
     private void OnGo()
     {
-        GameManager.AwaitingSearch = true;
+        EngineManager.AwaitingSearch = true;
 
-        GameManager.EngineReady();
+        EngineManager.EngineReady();
     }
 }
