@@ -79,7 +79,7 @@ public static class Engine
 
         if (Board.GetPlayerColor() == Piece.WHITE != Board.GetWhiteToMove())
         {
-            //GameManager.Instance.MakeEngineMove(searchPath[0]);
+            GameManager.Instance.MakeEngineMove(result.SearchPath[0]);
         }
     }
 

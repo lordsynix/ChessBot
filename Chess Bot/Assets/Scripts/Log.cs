@@ -18,7 +18,7 @@ public static class Log
         }
 
         // Schreibt eine Startmeldung in die Log-Datei.
-        WriteToLog("Loaded console");
+        WriteToLog("Loaded chess board scene");
     }
 
     private static void WriteToLog(string message)
